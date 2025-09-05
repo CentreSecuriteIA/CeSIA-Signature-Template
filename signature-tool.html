@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Signature Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .form-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .preview-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"], input[type="email"], input[type="tel"], input[type="url"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #02358C;
+        }
+        .copy-button {
+            background-color: #02358C;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        .copy-button:hover {
+            background-color: #024080;
+        }
+        .preview {
+            border: 1px solid #ddd;
+            padding: 20px;
+            background: white;
+            min-height: 200px;
+        }
+        h2 {
+            color: #02358C;
+            margin-top: 0;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Email Signature Generator</h1>
+    
+    <div class="container">
+        <div class="form-section">
+            <h2>Customize Your Signature</h2>
+            <form id="signatureForm">
+                <div class="form-group">
+                    <label for="name">Full Name:</label>
+                    <input type="text" id="name" value="Lucie Philippon" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="title">Job Title:</label>
+                    <input type="text" id="title" value="Interim Chief of Staff" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="organization">Organization:</label>
+                    <input type="text" id="organization" value="Centre pour la Sécurité de l'IA" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" value="lucie.philippon@securite-ia.fr" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone:</label>
+                    <input type="tel" id="phone" value="+33 1 23 45 67 89 [to replace]" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="website">Website:</label>
+                    <input type="url" id="website" value="www.securite-ia.fr" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="twitter">Twitter URL:</label>
+                    <input type="url" id="twitter" value="https://twitter.com/securite_ia">
+                </div>
+                
+                <div class="form-group">
+                    <label for="linkedin">LinkedIn URL:</label>
+                    <input type="url" id="linkedin" value="https://www.linkedin.com/company/securite-ia/">
+                </div>
+                
+                <button type="button" class="copy-button" onclick="copySignature()">Copy HTML to Clipboard</button>
+                <div id="status" class="status"></div>
+            </form>
+        </div>
+        
+        <div class="preview-section">
+            <h2>Preview</h2>
+            <div id="preview" class="preview">
+                Loading template...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let templateHTML = '';
+        let iconCache = {};
+
+        // Convert image to base64
+        async function imageToBase64(imagePath) {
+            if (iconCache[imagePath]) {
+                return iconCache[imagePath];
+            }
+            
+            try {
+                const response = await fetch(imagePath);
+                const blob = await response.blob();
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        iconCache[imagePath] = reader.result;
+                        resolve(reader.result);
+                    };
+                    reader.readAsDataURL(blob);
+                });
+            } catch (error) {
+                console.error('Error converting image to base64:', error);
+                return null;
+            }
+        }
+
+        // Load template HTML
+        async function loadTemplate() {
+            try {
+                const response = await fetch('template.html');
+                templateHTML = await response.text();
+                updatePreview();
+            } catch (error) {
+                console.error('Error loading template:', error);
+                document.getElementById('preview').innerHTML = 'Error loading template.html';
+            }
+        }
+
+        // Replace external images with base64 versions
+        async function replaceImagesWithBase64(html) {
+            // Map of external URLs to local files
+            const imageMap = {
+                'https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png': 'email-icon.png',
+                'https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png': 'phone-icon.png',
+                'https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png': 'link-icon.png',
+                'https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png': 'twitter-icon.png',
+                'https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png': 'linkedin-icon.png',
+                'https://i.imgur.com/YWIe5eB.png': 'cesia_logo.png'
+            };
+
+            let updatedHTML = html;
+            
+            for (const [externalUrl, localFile] of Object.entries(imageMap)) {
+                const base64 = await imageToBase64(localFile);
+                if (base64) {
+                    updatedHTML = updatedHTML.replace(new RegExp(externalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), base64);
+                }
+            }
+            
+            return updatedHTML;
+        }
+
+        // Update preview with current form values
+        async function updatePreview() {
+            if (!templateHTML) return;
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                title: document.getElementById('title').value,
+                organization: document.getElementById('organization').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                website: document.getElementById('website').value,
+                twitter: document.getElementById('twitter').value,
+                linkedin: document.getElementById('linkedin').value
+            };
+
+            let updatedHTML = templateHTML;
+            
+            // Replace placeholder values with form data
+            updatedHTML = updatedHTML.replace(/Lucie Philippon/g, formData.name);
+            updatedHTML = updatedHTML.replace(/Interim Chief of Staff/g, formData.title);
+            updatedHTML = updatedHTML.replace(/Centre pour la Sécurité de l'IA/g, formData.organization);
+            updatedHTML = updatedHTML.replace(/lucie\.philippon@securite-ia\.fr/g, formData.email);
+            updatedHTML = updatedHTML.replace(/\+33 1 23 45 67 89 \[to replace\]/g, formData.phone);
+            updatedHTML = updatedHTML.replace(/www\.securite-ia\.fr/g, formData.website.replace(/^https?:\/\//, ''));
+            updatedHTML = updatedHTML.replace(/href="\/\/www\.securite-ia\.fr"/g, `href="//${formData.website.replace(/^https?:\/\//, '')}"`);
+            updatedHTML = updatedHTML.replace(/https:\/\/twitter\.com\/securite_ia/g, formData.twitter);
+            updatedHTML = updatedHTML.replace(/https:\/\/www\.linkedin\.com\/company\/securite-ia\//g, formData.linkedin);
+
+            // Replace external images with base64
+            updatedHTML = await replaceImagesWithBase64(updatedHTML);
+            
+            document.getElementById('preview').innerHTML = updatedHTML;
+        }
+
+        // Copy signature HTML to clipboard
+        async function copySignature() {
+            const preview = document.getElementById('preview');
+            const htmlContent = preview.innerHTML;
+            
+            try {
+                await navigator.clipboard.writeText(htmlContent);
+                showStatus('HTML copied to clipboard successfully!', 'success');
+            } catch (error) {
+                console.error('Error copying to clipboard:', error);
+                showStatus('Error copying to clipboard. Please try again.', 'error');
+            }
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+
+        // Add event listeners for real-time updates
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTemplate();
+            
+            // Add input event listeners for real-time preview
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.addEventListener('input', updatePreview);
+            });
+        });
+    </script>
+</body>
+</html>
